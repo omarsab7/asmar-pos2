@@ -37,18 +37,3 @@ export async function PATCH(req: Request) {
   });
   return NextResponse.json({ ingredient });
 }
-
-// edit an ingredient fully (name, cost, min, unit, and set absolute stock)
-export async function PUT(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const b = await req.json();
-  const data: any = {};
-  if (b.nameAr !== undefined) data.nameAr = b.nameAr;
-  if (b.unit !== undefined) data.unit = b.unit;
-  if (b.costPerUnit !== undefined) data.costPerUnit = Number(b.costPerUnit) || 0;
-  if (b.minStock !== undefined) data.minStock = Number(b.minStock) || 0;
-  if (b.stock !== undefined) data.stock = Number(b.stock) || 0;
-  const ingredient = await prisma.ingredient.update({ where: { id: b.id }, data });
-  return NextResponse.json({ ingredient });
-}

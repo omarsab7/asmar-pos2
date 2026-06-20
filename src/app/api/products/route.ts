@@ -24,16 +24,3 @@ export async function POST(req: Request) {
   });
   return NextResponse.json({ product });
 }
-
-// edit a product (price, arabic name, category)
-export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const b = await req.json();
-  const data: any = {};
-  if (b.price !== undefined) data.price = Number(b.price) || 0;
-  if (b.nameAr !== undefined) data.nameAr = b.nameAr;
-  if (b.category !== undefined) data.category = b.category;
-  const product = await prisma.product.update({ where: { id: b.id }, data });
-  return NextResponse.json({ product });
-}

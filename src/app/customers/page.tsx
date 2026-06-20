@@ -2,13 +2,12 @@
 import { useEffect, useState } from "react";
 import Shell from "@/components/Shell";
 
-const money = (n: number) => Math.round(n || 0).toLocaleString("en-US") + " ل.ل";
+const money = (n: number) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
 
 export default function Customers() {
   const [list, setList] = useState<any[]>([]);
   const [form, setForm] = useState({ name: "", phone: "", note: "" });
   const [open, setOpen] = useState<any>(null);
-  const [q, setQ] = useState("");
 
   async function load() { const r = await fetch("/api/customers"); const j = await r.json(); setList(j.customers || []); }
   useEffect(() => { load(); }, []);
@@ -34,9 +33,8 @@ export default function Customers() {
         <button className="btn btn-gold mt-3" onClick={add}>إضافة</button>
       </div>
 
-      <input className="input mb-3" placeholder="🔍 دوّر باسم أو رقم زبون..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {list.filter((c) => { const t=q.trim().toLowerCase(); return !t || c.name.toLowerCase().includes(t) || (c.phone||"").toLowerCase().includes(t); }).map((c) => (
+        {list.map((c) => (
           <button key={c.id} onClick={() => openCustomer(c.id)} className="card p-4 text-right hover:border-caramel">
             <div className="flex items-center justify-between">
               <div className="font-semibold text-cream">{c.name}</div>

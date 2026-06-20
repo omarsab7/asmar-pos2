@@ -1,4 +1,4 @@
-export const money = (n: number) => Math.round(n || 0).toLocaleString("en-US") + " ل.ل";
+export const money = (n: number) => "$" + (Math.round(n * 100) / 100).toFixed(2);
 
 // start of today (local server time)
 export function startOfToday(): Date {
