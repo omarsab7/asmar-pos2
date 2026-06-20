@@ -87,23 +87,20 @@ async function main() {
   // 1) المكوّنات: حدّث التكلفة/الاسم/الوحدة، واحفظ الكمية الحالية (لا تلمس stock عند التحديث)
   const ingId: Record<string, string> = {};
   for (const i of ingredients) {
-    const row = await prisma.ingredient.upsert({
-      where: { name: i.name },
-      update: { nameAr: i.nameAr, unit: i.unit, costPerUnit: i.cost, minStock: i.min },
-      create: { name: i.name, nameAr: i.nameAr, unit: i.unit, stock: i.stock, minStock: i.min, costPerUnit: i.cost },
-    });
+    const existing = await prisma.ingredient.findUnique({ where: { name: i.name } });
+    const row = existing
+      ? existing // موجود: ما نلمس تكلفتك ولا كميتك ولا اسمك — تعديلاتك محفوظة
+      : await prisma.ingredient.create({ data: { name: i.name, nameAr: i.nameAr, unit: i.unit, stock: i.stock, minStock: i.min, costPerUnit: i.cost } });
     ingId[i.name] = row.id;
   }
 
-  // 2) المنتجات: حدّث السعر/التصنيف وأعد بناء الوصفة (الوصفة غير مرتبطة بالمبيعات فآمن حذفها)
+  // 2) المنتجات: نحط الجديد فقط. الموجود ما نلمس سعرو ولا اسمو — تعديلاتك من الموقع محفوظة للأبد.
   for (const p of products) {
-    const prod = await prisma.product.upsert({
-      where: { name: p.name },
-      update: { nameAr: p.nameAr, category: p.category, price: p.price, active: true },
-      create: { name: p.name, nameAr: p.nameAr, category: p.category, price: p.price, active: true },
-    });
-    await prisma.recipeItem.deleteMany({ where: { productId: prod.id } });
-    await prisma.recipeItem.createMany({ data: p.recipe.map((r) => ({ productId: prod.id, ingredientId: ingId[r.ing], qty: r.qty })) });
+    let prod = await prisma.product.findUnique({ where: { name: p.name } });
+    if (!prod) {
+      prod = await prisma.product.create({ data: { name: p.name, nameAr: p.nameAr, category: p.category, price: p.price, active: true } });
+      await prisma.recipeItem.createMany({ data: p.recipe.map((r) => ({ productId: prod!.id, ingredientId: ingId[r.ing], qty: r.qty })) });
+    }
   }
 
   // 3) تنظيف البيانات التجريبية القديمة بدون مسّ المبيعات:
