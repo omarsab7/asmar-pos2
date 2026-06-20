@@ -17,7 +17,6 @@ export default function POS() {
   const [listening, setListening] = useState(false);
   const [payMode, setPayMode] = useState<"paid" | "unpaid" | "partial">("paid");
   const [paidAmount, setPaidAmount] = useState(0);
-  const [voiceRes, setVoiceRes] = useState<any>(null);
   const recRef = useRef<any>(null);
 
   async function load() { const r = await fetch("/api/products"); const j = await r.json(); setProducts(j.products || []); }
@@ -49,55 +48,19 @@ export default function POS() {
     } else flash("صار خطأ بالبيع.");
   }
 
-  const norm = (s: string) => (s || "").toString().toLowerCase()
-    .replace(/[\u064B-\u0652]/g, "")
-    .replace(/[إأآا]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/ؤ/g, "و").replace(/ئ/g, "ي")
-    .replace(/[^\u0621-\u064Aa-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-
-  // يفهم من الجملة: المنتجات + الزبون
-  function parseVoice(t: string) {
-    const nt = norm(t);
-    const matched: { id: string; name: string; qty: number }[] = [];
-    for (const p of products) {
-      const np = norm(p.nameAr);
-      if (!np) continue;
-      const toks = np.split(" ");
-      const hit = nt.includes(np) || (toks.length > 1 && toks.every((w) => w.length > 1 && nt.includes(w))) || (toks.length === 1 && np.length > 2 && nt.includes(np));
-      if (hit) matched.push({ id: p.id, name: p.nameAr, qty: 1 });
-    }
-    let cust: any = null;
-    for (const c of customers) { if (norm(c.name) && nt.includes(norm(c.name))) { cust = c; break; } }
-    return { transcript: t, items: matched, customer: cust };
-  }
-
   function voiceSell() {
     const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
     if (!SR) { flash("المتصفح ما بيدعم الصوت — جرّب Chrome."); return; }
     if (listening) { recRef.current?.stop(); setListening(false); return; }
     const rec = new SR(); rec.lang = "ar-SA"; rec.interimResults = false;
-    rec.onresult = (e: any) => {
+    rec.onresult = async (e: any) => {
       const t = e.results[0][0].transcript;
-      const parsed = parseVoice(t);
-      if (!parsed.items.length) { flash(`سمعت: "${t}" — ما عرفت المنتج. جرّب كمان.`); return; }
-      buzz(); setVoiceRes(parsed);
+      const res = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: t, type: "voice" }) });
+      const data = await res.json(); flash(data.message?.split("\n")[0] || "تمّ");
+      if (data.action) window.dispatchEvent(new CustomEvent("asmar:refresh"));
     };
     rec.onend = () => setListening(false); rec.onerror = () => setListening(false);
     recRef.current = rec; rec.start(); setListening(true);
-  }
-
-  function confirmVoice() {
-    if (!voiceRes) return;
-    setCart((c) => {
-      const n = { ...c };
-      for (const it of voiceRes.items) {
-        const p = products.find((x) => x.id === it.id);
-        if (p) n[p.id] = { name: p.nameAr, price: p.price, qty: (n[p.id]?.qty || 0) + it.qty };
-      }
-      return n;
-    });
-    if (voiceRes.customer) setCustomerId(voiceRes.customer.id);
-    flash("✅ تضافوا للسلة");
-    setVoiceRes(null);
   }
 
   return (
@@ -186,37 +149,6 @@ export default function POS() {
             {payMode === "unpaid" && <div className="mt-2 text-xs text-red-400">⚠️ كل المبلغ ({money(total)}) رح يتسجّل دين على الزبون.</div>}
 
             <button onClick={checkout} disabled={!count} className="btn btn-gold mt-4 w-full !py-3.5 text-lg disabled:opacity-40">تسجيل البيع 💳</button>
-          </div>
-        </div>
-      )}
-
-      {voiceRes && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 md:items-center" onClick={() => setVoiceRes(null)}>
-          <div className="w-full max-w-md rounded-t-3xl bg-panel p-4 md:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 font-bold text-gold">🎤 شو فهمت</div>
-            <div className="mb-3 text-xs text-cream/40">سمعت: "{voiceRes.transcript}"</div>
-            <div className="mb-2 space-y-1">
-              {voiceRes.items.map((it: any, i: number) => (
-                <div key={i} className="flex items-center justify-between rounded-xl bg-card px-3 py-2 text-sm">
-                  <span className="text-cream">{it.name}</span>
-                  <span className="flex items-center gap-2">
-                    <button onClick={() => setVoiceRes({ ...voiceRes, items: voiceRes.items.map((x: any, j: number) => j === i ? { ...x, qty: Math.max(1, x.qty - 1) } : x) })} className="h-7 w-7 rounded-full bg-mocha text-cream">−</button>
-                    <b className="text-gold">{it.qty}</b>
-                    <button onClick={() => setVoiceRes({ ...voiceRes, items: voiceRes.items.map((x: any, j: number) => j === i ? { ...x, qty: x.qty + 1 } : x) })} className="h-7 w-7 rounded-full bg-mocha text-cream">+</button>
-                    <button onClick={() => setVoiceRes({ ...voiceRes, items: voiceRes.items.filter((_: any, j: number) => j !== i) })} className="mr-1 text-red-400">✕</button>
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="mb-3 rounded-xl bg-card px-3 py-2 text-sm">
-              <span className="text-cream/60">الزبون: </span>
-              <span className="text-cream">{voiceRes.customer ? voiceRes.customer.name : "بدون زبون"}</span>
-            </div>
-            {!voiceRes.items.length && <div className="mb-2 text-sm text-red-400">ما ضل منتج — سكّر وجرّب كمان.</div>}
-            <div className="flex gap-2">
-              <button className="btn btn-gold flex-1" disabled={!voiceRes.items.length} onClick={confirmVoice}>✅ أكّد وأضف للسلة</button>
-              <button className="flex-1 rounded-xl border border-caramel/30 py-2 text-cream/70" onClick={() => { setVoiceRes(null); voiceSell(); }}>🎤 جرّب كمان</button>
-            </div>
           </div>
         </div>
       )}
