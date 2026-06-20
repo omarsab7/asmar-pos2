@@ -1,0 +1,123 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("CASHIER") // ADMIN | CASHIER
+  sales     Sale[]
+  aiLogs    AIQueryLog[]
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id        String       @id @default(cuid())
+  name      String       @unique // English / latin name
+  nameAr    String       // Arabic display name
+  category  String       @default("عام")
+  price     Float
+  active    Boolean      @default(true)
+  recipe    RecipeItem[]
+  saleItems SaleItem[]
+  createdAt DateTime     @default(now())
+}
+
+model Ingredient {
+  id          String         @id @default(cuid())
+  name        String         @unique // English name
+  nameAr      String         // Arabic name
+  unit        String         @default("unit") // g | ml | pcs ...
+  stock       Float          @default(0)
+  minStock    Float          @default(0)
+  costPerUnit Float          @default(0)
+  recipeItems RecipeItem[]
+  movements   InventoryItem[]
+  createdAt   DateTime       @default(now())
+}
+
+model RecipeItem {
+  id           String     @id @default(cuid())
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  ingredientId String
+  qty          Float      // quantity of ingredient consumed per 1 product unit
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  total         Float
+  discount      Float      @default(0)
+  cogs          Float      @default(0) // cost of goods sold (for profit)
+  paymentMethod String     @default("cash")
+  user          User?      @relation(fields: [userId], references: [id])
+  userId        String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  customerId    String?
+  items         SaleItem[]
+  createdAt     DateTime   @default(now())
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId    String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int
+  price     Float   // unit price at time of sale
+}
+
+model InventoryItem {
+  id           String     @id @default(cuid())
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  ingredientId String
+  change       Float      // +in / -out
+  type         String     @default("ADJUST") // IN | OUT | ADJUST
+  reason       String?
+  createdAt    DateTime   @default(now())
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  supplier  String?
+  total     Float    @default(0)
+  note      String?
+  rawText   String?  // OCR text of invoice
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  label     String
+  amount    Float
+  createdAt DateTime @default(now())
+}
+
+model AIQueryLog {
+  id        String   @id @default(cuid())
+  input     String
+  type      String   @default("text") // text | voice | image
+  intent    String?
+  response  String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  createdAt DateTime @default(now())
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?  @unique
+  note      String?
+  sales     Sale[]
+  createdAt DateTime @default(now())
+}

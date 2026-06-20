@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+html, body { background:#15131c; color:#f3ead8; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold transition; }
+.btn-gold { @apply bg-gradient-to-br from-caramel to-gold text-[#1a1410] hover:brightness-105; }
+.btn-out { @apply border border-caramel/60 text-cream hover:bg-caramel hover:text-[#1a1410]; }
+.input { @apply w-full rounded-xl border border-caramel/25 bg-[#1c1826] px-3 py-2.5 text-cream outline-none focus:border-caramel; }
+.card { @apply rounded-2xl border border-caramel/20 bg-card; }

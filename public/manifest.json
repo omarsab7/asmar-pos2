@@ -1,0 +1,23 @@
+{
+  "name": "Asmar Coffee — POS",
+  "short_name": "Asmar POS",
+  "description": "نظام كاشير ومخزون ومساعد ذكي لمقهى أسمر",
+  "start_url": "/pos",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15131c",
+  "theme_color": "#15131c",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "الكاشير", "url": "/pos" },
+    { "name": "المخزون", "url": "/inventory" },
+    { "name": "مساعد أسمر", "url": "/ai-assistant" }
+  ]
+}
