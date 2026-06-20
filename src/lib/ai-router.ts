@@ -10,6 +10,8 @@ export type Intent =
   | "UPDATE_INVENTORY"
   | "TOP_PRODUCTS"
   | "ANALYZE_BUSINESS"
+  | "PROFIT_MARGINS"
+  | "REORDER"
   | "PARSE_INVOICE"
   | "ANALYZE_SHELF"
   | "UNKNOWN";
@@ -78,6 +80,12 @@ export function parseQuery(text: string): ParsedQuery {
   }
   if (has("اكثر منتج", "أكثر مبيع", "best seller", "top product", "اكثر مبيعا")) {
     return { intent: "TOP_PRODUCTS", range: detectRange(t), raw };
+  }
+  if (has("لازم اطلب", "اعادة طلب", "اعد الطلب", "شو ناقص", "شو خلص", "reorder", "نطلب")) {
+    return { intent: "REORDER", raw };
+  }
+  if (has("هامش", "ربح المنتج", "ربح كل", "ارباح المنتجات", "margin", "تحليل التكلفه", "تكلفه وربح", "ربح الصنف")) {
+    return { intent: "PROFIT_MARGINS", raw };
   }
   if (has("ربح", "الارباح", "profit", "كم ربحت")) {
     return { intent: "GET_PROFIT", range: detectRange(t), raw };

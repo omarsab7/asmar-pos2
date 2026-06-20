@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Shell from "@/components/Shell";
 
-const money = (n: number) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
+const money = (n: number) => Math.round(n || 0).toLocaleString("en-US") + " ل.ل";
 
 export default function Dashboard() {
   const [d, setD] = useState<any>(null);
@@ -23,7 +23,10 @@ export default function Dashboard() {
 
   return (
     <Shell>
-      <h1 className="mb-5 text-2xl font-bold text-gold">لوحة التحكم</h1>
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gold">لوحة التحكم</h1>
+        <a href="/invoices" className="rounded-xl border border-caramel/40 px-3 py-2 text-sm text-cream hover:bg-card">🧾 الفواتير</a>
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map((c) => (
           <div key={c.label} className="card p-4">

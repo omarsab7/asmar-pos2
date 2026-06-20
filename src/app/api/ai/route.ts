@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseQuery, parseImageMode, parseInvoiceLines } from "@/lib/ai-router";
 import {
-  rangeFor, getStats, getTopProducts, getLowStock,
+  rangeFor, getStats, getTopProducts, getLowStock, getProductMargins,
   findProductByText, findIngredientByText, createSale,
 } from "@/lib/analytics";
 import { money } from "@/lib/utils";
@@ -73,6 +73,18 @@ export async function POST(req: Request) {
       const updated = await prisma.ingredient.update({ where: { id: ing.id }, data: { stock: { increment: amount } } });
       await prisma.inventoryItem.create({ data: { ingredientId: ing.id, change: amount, type: "IN", reason: "AI: تحديث مخزون" } });
       res = { intent: parsed.intent, message: `✅ زدنا ${amount}${ing.unit} على ${ing.nameAr}. الرصيد الجديد ${updated.stock}${ing.unit}.`, action: "OPEN_INVENTORY", data: updated };
+      break;
+    }
+    case "PROFIT_MARGINS": {
+      const m = (await getProductMargins()).sort((a, b) => b.profit - a.profit);
+      const top = m.slice(0, 8).map((x) => `• ${x.nameAr}: ربح ${money(x.profit)}/حبة (هامش ${x.margin}%)`).join("\n");
+      const unknown = m.filter((x) => x.cogs === 0).length;
+      res = { intent: parsed.intent, message: `💹 ربح كل صنف (الأعلى):\n${top}` + (unknown ? `\n\nℹ️ ${unknown} صنف تكلفتهن غير مدخلة بعد — عبّيها من المخزون ليصير الربح دقيق.` : ""), data: m };
+      break;
+    }
+    case "REORDER": {
+      const low = await getLowStock();
+      res = { intent: parsed.intent, message: low.length ? `🛒 لازم تطلب هالمواد (قاربت تخلص):\n${low.map((l) => `• ${l.nameAr}: باقي ${l.stock}${l.unit}`).join("\n")}` : "✅ ما في شي ناقص حالياً، المخزون تمام.", action: "OPEN_INVENTORY", data: low };
       break;
     }
     case "ANALYZE_BUSINESS": {
