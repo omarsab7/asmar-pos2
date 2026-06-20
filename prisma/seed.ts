@@ -2,76 +2,123 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
+// كل الأسعار بالليرة اللبنانية (ل.ل). التكلفة = سعر الحبة من فاتورة الشراء (0 = غير معروفة، عبّيها من المخزون).
+// آمن للتكرار: يحدّث المنيو والأسعار والتكاليف بدون مسح المبيعات أو الزباين، ويحافظ على كميات المخزون.
+
+type Ing = { name: string; nameAr: string; unit: string; stock: number; min: number; cost: number };
+type Prod = { name: string; nameAr: string; category: string; price: number; recipe: { ing: string; qty: number }[] };
+
+const ingredients: Ing[] = [
+  { name: "Cup", nameAr: "كاسة", unit: "كاسة", stock: 500, min: 100, cost: 0 },
+  { name: "Nescafe Sachet", nameAr: "ظرف نسكافيه", unit: "ظرف", stock: 30, min: 6, cost: 15000 },
+  { name: "Capuchino Sachet", nameAr: "ظرف كابتشينو", unit: "ظرف", stock: 22, min: 6, cost: 17714 },
+];
+
+const ready: [string, string, string, number, number, number, number, string][] = [
+  ["Xxl", "إكس إكس إل", "بارد", 70000, 39375, 24, 6, "حبة"],
+  ["Mrs jus", "مسز جوس", "بارد", 30000, 16650, 24, 6, "حبة"],
+  ["Bonjus milk shake", "بونجوس ميلك شيك", "بارد", 50000, 0, 24, 6, "حبة"],
+  ["Xtra", "إكسترا", "بارد", 50000, 32437, 24, 6, "حبة"],
+  ["Pepsi", "ببسي", "بارد", 40000, 17512, 24, 6, "حبة"],
+  ["Mogo mogo", "موغو موغو", "بارد", 100000, 33750, 24, 6, "حبة"],
+  ["Ice coffee", "آيس كوفي", "قهوة", 80000, 0, 20, 5, "حبة"],
+  ["Indomi", "إندومي", "سناك", 70000, 0, 24, 6, "حبة"],
+  ["Browni", "براوني ريماس", "سناك", 50000, 25012, 24, 6, "حبة"],
+  ["Rimas", "ريماس محاشي", "سناك", 40000, 15638, 24, 6, "حبة"],
+  ["Chips Dolsi", "شيبس دولسي", "سناك", 50000, 24834, 32, 6, "حبة"],
+  ["Chips Ringo", "شيبس رينغو", "سناك", 40000, 0, 24, 6, "حبة"],
+  ["Chips sghir", "شيبس صغير", "سناك", 20000, 0, 24, 6, "حبة"],
+  ["Dolsi kbir", "دولسي كبير", "سناك", 100000, 65644, 16, 4, "حبة"],
+  ["Karkesh kbir", "قرقش كبير", "سناك", 100000, 31650, 12, 4, "حبة"],
+  ["Biskrem", "بيسكريم", "سناك", 100000, 0, 24, 6, "حبة"],
+  ["Mars", "مارس", "سناك", 80000, 0, 24, 6, "حبة"],
+  ["Metro", "مترو", "سناك", 40000, 0, 24, 6, "حبة"],
+  ["Albeni", "ألبيني", "سناك", 40000, 0, 24, 6, "حبة"],
+  ["Chco prine", "تشوكو برينس", "سناك", 50000, 0, 24, 6, "حبة"],
+  ["Popinz", "بوبينز", "سناك", 20000, 0, 24, 6, "حبة"],
+  ["Marlboro", "مارلبورو أحمر", "دخان", 200000, 180000, 10, 3, "علبة"],
+  ["Winston", "وينستون لايت", "دخان", 180000, 151830, 10, 3, "علبة"],
+  ["Kent", "كنت", "دخان", 180000, 0, 10, 3, "علبة"],
+  ["Davidoff", "دافيدوف", "دخان", 170000, 0, 10, 3, "علبة"],
+  ["Cedars", "سيدرز", "دخان", 90000, 75870, 10, 3, "علبة"],
+  ["Arghileh Edara", "أرغيلة إدارة", "أرغيلة", 400000, 0, 999, 0, "أرغيلة"],
+  ["Arghileh Khalta", "أرغيلة خلطة", "أرغيلة", 350000, 0, 999, 0, "أرغيلة"],
+  ["Arghileh Hamod Naana", "أرغيلة حامض ونعنع", "أرغيلة", 350000, 0, 999, 0, "أرغيلة"],
+  ["Tabseh", "تبسة مخلوطة", "أرغيلة", 50000, 0, 99, 6, "تبسة"],
+  ["Buza Sandwich", "ساندويش بوظة", "بوظة", 50000, 0, 99, 10, "حبة"],
+  ["Corne Sghir", "كورنيه صغير", "بوظة", 50000, 0, 99, 10, "حبة"],
+  ["Corne Kbir", "كورنيه كبير", "بوظة", 100000, 0, 99, 10, "حبة"],
+  ["Clasico Sghir", "كلاسيكو صغير", "بوظة", 80000, 0, 99, 10, "حبة"],
+  ["Clasico Kbir", "كلاسيكو كبير", "بوظة", 100000, 0, 99, 10, "حبة"],
+  ["Boule Buza", "تعباية بوظة", "بوظة", 25000, 0, 999, 0, "تعباية"],
+];
+
+const products: Prod[] = [
+  { name: "Nescafe", nameAr: "نسكافيه", category: "قهوة", price: 60000, recipe: [{ ing: "Nescafe Sachet", qty: 1 }, { ing: "Cup", qty: 1 }] },
+  { name: "Capuchino", nameAr: "كابتشينو", category: "قهوة", price: 60000, recipe: [{ ing: "Capuchino Sachet", qty: 1 }, { ing: "Cup", qty: 1 }] },
+];
+
+for (const [name, nameAr, category, price, cost, stock, min, unit] of ready) {
+  ingredients.push({ name, nameAr, unit, stock, min, cost });
+  products.push({ name, nameAr, category, price, recipe: [{ ing: name, qty: 1 }] });
+}
+
 async function main() {
   const adminPass = await bcrypt.hash("admin123", 10);
   const cashierPass = await bcrypt.hash("cashier123", 10);
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@asmar.coffee" }, update: {},
-    create: { name: "Bachar Hawli", email: "admin@asmar.coffee", password: adminPass, role: "ADMIN" },
-  });
-  await prisma.user.upsert({
-    where: { email: "cashier@asmar.coffee" }, update: {},
-    create: { name: "Cashier", email: "cashier@asmar.coffee", password: cashierPass, role: "CASHIER" },
-  });
+  await prisma.user.upsert({ where: { email: "admin@asmar.coffee" }, update: {},
+    create: { name: "Bachar Hawli", email: "admin@asmar.coffee", password: adminPass, role: "ADMIN" } });
+  await prisma.user.upsert({ where: { email: "cashier@asmar.coffee" }, update: {},
+    create: { name: "Cashier", email: "cashier@asmar.coffee", password: cashierPass, role: "CASHIER" } });
 
-  const ingDefs = [
-    { name: "Coffee Beans", nameAr: "حبوب قهوة", unit: "g", stock: 5000, minStock: 1000, costPerUnit: 0.05 },
-    { name: "Milk", nameAr: "حليب", unit: "ml", stock: 20000, minStock: 4000, costPerUnit: 0.002 },
-    { name: "Sugar", nameAr: "سكر", unit: "g", stock: 8000, minStock: 1500, costPerUnit: 0.001 },
-    { name: "Chocolate", nameAr: "شوكولا", unit: "g", stock: 3000, minStock: 600, costPerUnit: 0.02 },
-    { name: "Cups", nameAr: "كاسات", unit: "pcs", stock: 500, minStock: 120, costPerUnit: 0.10 },
-    { name: "Ice", nameAr: "تلج", unit: "g", stock: 100000, minStock: 8000, costPerUnit: 0.0001 },
-    { name: "Lemon", nameAr: "ليمون", unit: "pcs", stock: 90, minStock: 25, costPerUnit: 0.30 },
-    { name: "Mint", nameAr: "نعنع", unit: "g", stock: 800, minStock: 200, costPerUnit: 0.01 },
-  ];
-  const ing: Record<string, string> = {};
-  for (const d of ingDefs) {
-    const row = await prisma.ingredient.upsert({ where: { name: d.name }, update: {}, create: d });
-    ing[d.name] = row.id;
+  const oldTest = await prisma.ingredient.findFirst({ where: { name: "Coffee Beans" } });
+  if (oldTest) {
+    await prisma.saleItem.deleteMany({});
+    await prisma.sale.deleteMany({});
+    await prisma.inventoryItem.deleteMany({});
+    await prisma.aIQueryLog.deleteMany({});
+    await prisma.customer.deleteMany({});
+    console.log("🧹 مسح البيانات التجريبية القديمة (مرة واحدة).");
   }
 
-  const prodDefs: { name: string; nameAr: string; category: string; price: number; recipe: [string, number][] }[] = [
-    { name: "Cappuccino", nameAr: "كابتشينو", category: "قهوة", price: 2.0, recipe: [["Coffee Beans", 18], ["Milk", 150], ["Cups", 1]] },
-    { name: "Nescafe", nameAr: "نسكافيه", category: "قهوة", price: 1.5, recipe: [["Coffee Beans", 10], ["Milk", 100], ["Sugar", 6], ["Cups", 1]] },
-    { name: "Latte", nameAr: "لاتيه", category: "قهوة", price: 2.5, recipe: [["Coffee Beans", 18], ["Milk", 220], ["Cups", 1]] },
-    { name: "Ice Coffee", nameAr: "آيس كوفي", category: "بارد", price: 2.5, recipe: [["Coffee Beans", 18], ["Milk", 120], ["Ice", 200], ["Cups", 1]] },
-    { name: "Hot Chocolate", nameAr: "شوكولا ساخن", category: "ساخن", price: 2.2, recipe: [["Chocolate", 25], ["Milk", 200], ["Cups", 1]] },
-    { name: "Lemonade", nameAr: "عصير ليمون", category: "بارد", price: 2.0, recipe: [["Lemon", 2], ["Sugar", 20], ["Ice", 150], ["Mint", 5], ["Cups", 1]] },
-  ];
-  for (const p of prodDefs) {
-    const existing = await prisma.product.findUnique({ where: { name: p.name } });
-    if (existing) continue;
-    await prisma.product.create({ data: {
-      name: p.name, nameAr: p.nameAr, category: p.category, price: p.price,
-      recipe: { create: p.recipe.map(([n, qty]) => ({ ingredientId: ing[n], qty })) },
-    }});
+  const ingId: Record<string, string> = {};
+  for (const i of ingredients) {
+    const row = await prisma.ingredient.upsert({
+      where: { name: i.name },
+      update: { nameAr: i.nameAr, unit: i.unit, costPerUnit: i.cost, minStock: i.min },
+      create: { name: i.name, nameAr: i.nameAr, unit: i.unit, stock: i.stock, minStock: i.min, costPerUnit: i.cost },
+    });
+    ingId[i.name] = row.id;
   }
 
-  // customers (idempotent by phone)
-  const c1 = await prisma.customer.upsert({ where: { phone: "70111222" }, update: {}, create: { name: "أبو علي", phone: "70111222", note: "زبون يومي" } });
-  await prisma.customer.upsert({ where: { phone: "76333444" }, update: {}, create: { name: "سارة", phone: "76333444" } });
+  for (const p of products) {
+    const prod = await prisma.product.upsert({
+      where: { name: p.name },
+      update: { nameAr: p.nameAr, category: p.category, price: p.price, active: true },
+      create: { name: p.name, nameAr: p.nameAr, category: p.category, price: p.price, active: true },
+    });
+    await prisma.recipeItem.deleteMany({ where: { productId: prod.id } });
+    await prisma.recipeItem.createMany({ data: p.recipe.map((r) => ({ productId: prod.id, ingredientId: ingId[r.ing], qty: r.qty })) });
+  }
 
-  // sample sales/expenses only on a fresh DB
-  const saleCount = await prisma.sale.count();
-  if (saleCount === 0) {
-    async function rec(items: { name: string; qty: number }[], customerId?: string) {
-      let total = 0, cogs = 0; const saleItems: any[] = [];
-      for (const it of items) {
-        const product = await prisma.product.findFirst({ where: { name: it.name }, include: { recipe: { include: { ingredient: true } } } });
-        if (!product) continue;
-        total += product.price * it.qty;
-        for (const r of product.recipe) {
-          cogs += r.qty * r.ingredient.costPerUnit * it.qty;
-          await prisma.ingredient.update({ where: { id: r.ingredientId }, data: { stock: { decrement: r.qty * it.qty } } });
-        }
-        saleItems.push({ productId: product.id, qty: it.qty, price: product.price });
-      }
-      await prisma.sale.create({ data: { total, cogs, userId: admin.id, customerId, items: { create: saleItems } } });
+  const keepProd = new Set(products.map((p) => p.name));
+  for (const old of await prisma.product.findMany()) {
+    if (keepProd.has(old.name)) continue;
+    const used = await prisma.saleItem.count({ where: { productId: old.id } });
+    if (used > 0) {
+      await prisma.product.update({ where: { id: old.id }, data: { active: false } });
+    } else {
+      await prisma.recipeItem.deleteMany({ where: { productId: old.id } });
+      await prisma.product.delete({ where: { id: old.id } });
     }
-    await rec([{ name: "Cappuccino", qty: 3 }, { name: "Lemonade", qty: 2 }], c1.id);
-    await rec([{ name: "Ice Coffee", qty: 2 }, { name: "Nescafe", qty: 1 }]);
-    await prisma.expense.createMany({ data: [{ label: "كهرباء", amount: 15 }, { label: "صيانة", amount: 10 }] });
   }
-  console.log("✅ Seed done (idempotent). Login: admin@asmar.coffee / admin123");
+  const keepIng = new Set(ingredients.map((i) => i.name));
+  for (const old of await prisma.ingredient.findMany()) {
+    if (keepIng.has(old.name)) continue;
+    await prisma.ingredient.delete({ where: { id: old.id } });
+  }
+
+  const count = await prisma.product.count({ where: { active: true } });
+  console.log(`✅ Seed done. ${count} منتج فعّال بالليرة. الدخول: admin@asmar.coffee / admin123`);
 }
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
