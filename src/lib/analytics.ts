@@ -58,6 +58,16 @@ export const getSalesToday = () => getStats(today());
 export const getProfitToday = () => getStats(today());
 export const getTopProductsToday = (n = 5) => getTopProducts(today(), n);
 
+export async function getProductMargins() {
+  const products = await prisma.product.findMany({ where: { active: true }, include: { recipe: { include: { ingredient: true } } } });
+  return products.map((p) => {
+    const cogs = p.recipe.reduce((s, r) => s + r.qty * r.ingredient.costPerUnit, 0);
+    const profit = p.price - cogs;
+    const margin = p.price > 0 ? Math.round((profit / p.price) * 100) : 0;
+    return { nameAr: p.nameAr, price: p.price, cogs, profit, margin };
+  });
+}
+
 export async function getLowStock() {
   const ings = await prisma.ingredient.findMany();
   return ings.filter((i) => i.stock <= i.minStock)

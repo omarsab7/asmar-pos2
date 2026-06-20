@@ -8,6 +8,7 @@ import AIAssistant from "./AIAssistant";
 const NAV = [
   { href: "/dashboard", label: "الرئيسية", icon: "📊" },
   { href: "/reports", label: "التقارير", icon: "📈" },
+  { href: "/invoices", label: "الفواتير", icon: "🧾" },
   { href: "/pos", label: "كاشير", icon: "🧾" },
   { href: "/inventory", label: "المخزون", icon: "📦" },
   { href: "/products", label: "المنتجات", icon: "☕" },

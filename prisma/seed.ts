@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 // كل الأسعار بالليرة اللبنانية (ل.ل). التكلفة = سعر الحبة من فاتورة الشراء (0 = غير معروفة، عبّيها من المخزون).
-// آمن للتكرار: يحدّث المنيو والأسعار والتكاليف بدون مسح المبيعات أو الزباين، ويحافظ على كميات المخزون.
+// هذا الـseed آمن للتكرار: بيحدّث المنيو والأسعار والتكاليف بدون ما يمسح المبيعات أو الزباين، وبيحافظ على كميات المخزون اللي عدّلتها بإيدك.
 
 type Ing = { name: string; nameAr: string; unit: string; stock: number; min: number; cost: number };
 type Prod = { name: string; nameAr: string; category: string; price: number; recipe: { ing: string; qty: number }[] };
@@ -14,6 +14,7 @@ const ingredients: Ing[] = [
   { name: "Capuchino Sachet", nameAr: "ظرف كابتشينو", unit: "ظرف", stock: 22, min: 6, cost: 17714 },
 ];
 
+// الجاهز: [name, nameAr, category, price, cost, stock, min, unit]
 const ready: [string, string, string, number, number, number, number, string][] = [
   ["Xxl", "إكس إكس إل", "بارد", 70000, 39375, 24, 6, "حبة"],
   ["Mrs jus", "مسز جوس", "بارد", 30000, 16650, 24, 6, "حبة"],
@@ -71,6 +72,8 @@ async function main() {
   await prisma.user.upsert({ where: { email: "cashier@asmar.coffee" }, update: {},
     create: { name: "Cashier", email: "cashier@asmar.coffee", password: cashierPass, role: "CASHIER" } });
 
+  // 0) تنظيف لمرة واحدة فقط: إذا لسا موجودة بيانات تجريبية قديمة (مكوّن "Coffee Beans")،
+  //    امسح المبيعات التجريبية بالدولار. بعد أول نشر بيختفي هالمكوّن فما بترجع تنمسح أي بيانات حقيقية.
   const oldTest = await prisma.ingredient.findFirst({ where: { name: "Coffee Beans" } });
   if (oldTest) {
     await prisma.saleItem.deleteMany({});
@@ -81,6 +84,7 @@ async function main() {
     console.log("🧹 مسح البيانات التجريبية القديمة (مرة واحدة).");
   }
 
+  // 1) المكوّنات: حدّث التكلفة/الاسم/الوحدة، واحفظ الكمية الحالية (لا تلمس stock عند التحديث)
   const ingId: Record<string, string> = {};
   for (const i of ingredients) {
     const row = await prisma.ingredient.upsert({
@@ -91,6 +95,7 @@ async function main() {
     ingId[i.name] = row.id;
   }
 
+  // 2) المنتجات: حدّث السعر/التصنيف وأعد بناء الوصفة (الوصفة غير مرتبطة بالمبيعات فآمن حذفها)
   for (const p of products) {
     const prod = await prisma.product.upsert({
       where: { name: p.name },
@@ -101,12 +106,13 @@ async function main() {
     await prisma.recipeItem.createMany({ data: p.recipe.map((r) => ({ productId: prod.id, ingredientId: ingId[r.ing], qty: r.qty })) });
   }
 
+  // 3) تنظيف البيانات التجريبية القديمة بدون مسّ المبيعات:
   const keepProd = new Set(products.map((p) => p.name));
   for (const old of await prisma.product.findMany()) {
     if (keepProd.has(old.name)) continue;
     const used = await prisma.saleItem.count({ where: { productId: old.id } });
     if (used > 0) {
-      await prisma.product.update({ where: { id: old.id }, data: { active: false } });
+      await prisma.product.update({ where: { id: old.id }, data: { active: false } }); // عليه مبيعات: نخفيه فقط
     } else {
       await prisma.recipeItem.deleteMany({ where: { productId: old.id } });
       await prisma.product.delete({ where: { id: old.id } });
@@ -115,7 +121,7 @@ async function main() {
   const keepIng = new Set(ingredients.map((i) => i.name));
   for (const old of await prisma.ingredient.findMany()) {
     if (keepIng.has(old.name)) continue;
-    await prisma.ingredient.delete({ where: { id: old.id } });
+    await prisma.ingredient.delete({ where: { id: old.id } }); // يحذف حركاته ووصفاته (cascade)
   }
 
   const count = await prisma.product.count({ where: { active: true } });

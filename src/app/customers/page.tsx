@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Shell from "@/components/Shell";
 
-const money = (n: number) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
+const money = (n: number) => Math.round(n || 0).toLocaleString("en-US") + " ل.ل";
 
 export default function Customers() {
   const [list, setList] = useState<any[]>([]);

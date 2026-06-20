@@ -6,8 +6,8 @@ import { createSale } from "@/lib/analytics";
 
 export async function GET() {
   const sales = await prisma.sale.findMany({
-    orderBy: { createdAt: "desc" }, take: 20,
-    include: { items: { include: { product: true } } },
+    orderBy: { createdAt: "desc" }, take: 100,
+    include: { items: { include: { product: true } }, customer: true },
   });
   return NextResponse.json({ sales });
 }
