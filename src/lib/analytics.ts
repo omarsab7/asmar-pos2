@@ -92,7 +92,7 @@ export async function findIngredientByText(text: string) {
 
 export async function createSale(
   lines: { productId: string; qty: number }[],
-  opts: { discount?: number; userId?: string; paymentMethod?: string; customerId?: string } = {}
+  opts: { discount?: number; userId?: string; paymentMethod?: string; customerId?: string; paid?: number } = {}
 ) {
   const discount = opts.discount ?? 0;
   let total = 0, cogs = 0;
@@ -113,8 +113,10 @@ export async function createSale(
     }
   }
   total = Math.max(0, total - discount);
+  const paid = opts.paid !== undefined ? Math.max(0, opts.paid) : total; // افتراضياً مدفوع كامل
+  const paymentStatus = paid >= total ? "paid" : paid <= 0 ? "unpaid" : "partial";
   const sale = await prisma.sale.create({
-    data: { total, discount, cogs, userId: opts.userId, customerId: opts.customerId, paymentMethod: opts.paymentMethod ?? "cash", items: { create: saleItems } },
+    data: { total, discount, cogs, paid, paymentStatus, userId: opts.userId, customerId: opts.customerId, paymentMethod: opts.paymentMethod ?? "cash", items: { create: saleItems } },
     include: { items: { include: { product: true } } },
   });
   return { sale, warnings: [...new Set(warnings)] };

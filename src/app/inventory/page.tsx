@@ -8,6 +8,7 @@ export default function Inventory() {
   const [ings, setIngs] = useState<any[]>([]);
   const [form, setForm] = useState({ name: "", nameAr: "", unit: "حبة", stock: 0, minStock: 0, costPerUnit: 0 });
   const [edit, setEdit] = useState<any>(null);
+  const [q, setQ] = useState("");
 
   async function load() { const r = await fetch("/api/inventory"); const j = await r.json(); setIngs(j.ingredients || []); }
   useEffect(() => {
@@ -51,8 +52,9 @@ export default function Inventory() {
         <button className="btn btn-gold mt-3" onClick={addIngredient}>إضافة</button>
       </div>
 
+      <input className="input mb-3" placeholder="🔍 دوّر عن مادة..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="space-y-2">
-        {ings.map((i) => {
+        {ings.filter((i) => !q.trim() || i.nameAr.toLowerCase().includes(q.trim().toLowerCase())).map((i) => {
           const low = i.stock <= i.minStock;
           return (
             <div key={i.id} className="card p-3">

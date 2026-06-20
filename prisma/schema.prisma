@@ -57,6 +57,8 @@ model Sale {
   total         Float
   discount      Float      @default(0)
   cogs          Float      @default(0) // cost of goods sold (for profit)
+  paid          Float      @default(0) // المبلغ المدفوع فعلياً
+  paymentStatus String     @default("paid") // paid | partial | unpaid
   paymentMethod String     @default("cash")
   user          User?      @relation(fields: [userId], references: [id])
   userId        String?
